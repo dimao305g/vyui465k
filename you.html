@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>RTX Crypto Clicker v2</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0b0c10;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            display: flex;
+            max-width: 900px;
+            width: 100%;
+            gap: 20px;
+            margin-top: 50px;
+        }
+        .left-side, .right-side {
+            flex: 1;
+            background: #1f2833;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+            border: 1px solid #45f3ff;
+        }
+        .balance {
+            font-size: 2.5rem;
+            color: #45f3ff;
+            font-weight: bold;
+            margin: 15px 0;
+            text-shadow: 0 0 10px rgba(69, 243, 255, 0.5);
+        }
+        .click-btn {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(#1f2833, #0b0c10);
+            border: 5px solid #45f3ff;
+            color: #45f3ff;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 15px #45f3ff;
+            transition: transform 0.1s;
+            margin: 30px auto 0 auto;
+            display: block;
+        }
+        .click-btn:active {
+            transform: scale(0.95);
+        }
+        .shop-title {
+            font-size: 1.8rem;
+            color: #45f3ff;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #45f3ff;
+            padding-bottom: 10px;
+        }
+        .item {
+            background: #0b0c10;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #1f2833;
+        }
+        .item-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .item-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .item-desc {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        .buy-btn {
+            background: #45f3ff;
+            color: #000;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .buy-btn:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Левая панель: Кликер и Баланс -->
+    <div class="left-side">
+        <h2>Ваш Баланс:</h2>
+        <div class="balance" id="display-money">$0</div>
+        <p>Сила клика: <span id="display-click">$1</span></p>
+        <p>Авто-доход: <span id="display-auto">$0</span>/сек</p>
+        
+        <button class="click-btn" id="main-click-btn">КЛИК!</button>
+    </div>
+
+    <!-- Правая панель: Магазин видеокарт -->
+    <div class="right-side">
+        <div class="shop-title">Магазин RTX железа</div>
+        <div id="shop-list"></div>
+    </div>
+</div>
+
+<script>
+    // Главные переменные игры
+    let money = 0;
+    let clickPower = 1;
+    let autoIncome = 0;
+
+    // Список всех доступных апгрейдов и видеокарт
+    const cards = [
+        { id: 'paste', name: 'Термопаста MX-4', cost: 15, type: 'click', power: 1, count: 0, desc: '+1 к клику' },
+        { id: 'gtx1050', name: 'GTX 1050 Ti', cost: 50, type: 'auto', power: 1, count: 0, desc: '+1 $/сек' },
+        { id: 'rtx2060', name: 'RTX 2060 Super', cost: 300, type: 'auto', power: 7, count: 0, desc: '+7 $/сек' },
+        { id: 'rtx3070', name: 'RTX 3070 Ti', cost: 1200, type: 'auto', power: 32, count: 0, desc: '+32 $/сек' },
+        { id: 'rtx4090', name: 'RTX 4090 Monster', cost: 7500, type: 'auto', power: 180, count: 0, desc: '+180 $/сек' }
+    ];
+
+    // Функция обновления текстов и кнопок на экране
+    function refreshScreen() {
+        document.getElementById('display-money').innerText = '$' + money;
+        document.getElementById('display-click').innerText = '$' + clickPower;
+        document.getElementById('display-auto').innerText = '$' + autoIncome;
+
+        // Проверяем каждую кнопку — хватает ли денег
+        cards.forEach(card => {
+            const btn = document.getElementById('btn-' + card.id);
+            const costText = document.getElementById('cost-' + card.id);
+            const countText = document.getElementById('count-' + card.id);
+            
+            if (btn) {
+                btn.disabled = money < card.cost;
+                costText.innerText = card.cost;
+                countText.innerText = card.count;
+            }
+        });
+    }
+
+    // Создание списка товаров в магазине при запуске
+    function buildShop() {
+        const shopList = document.getElementById('shop-list');
+        shopList.innerHTML = ''; // Очищаем
+
+        cards.forEach(card => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+            itemDiv.innerHTML = `
+                <div class="item-info">
+                    <span class="item-name">${card.name} (<span id="count-${card.id}">0</span> шт.)</span>
+                    <span class="item-desc">${card.desc}</span>
+                </div>
+                <button class="buy-btn" id="btn-${card.id}" onclick="buyCard('${card.id}')">
+                    Купить: $<span id="cost-${card.id}">${card.cost}</span>
+                </button>
+            `;
+            shopList.appendChild(itemDiv);
+        });
+    }
+
+    // Функция покупки
+    window.buyCard = function(id) {
+        const card = cards.find(c => c.id === id);
+        if (!card || money < card.cost) return;
+
+        money -= card.cost;
+        card.count++;
+        
+        // Цена растет на 20% после каждой покупки
+        card.cost = Math.floor(card.cost * 1.2);
+
+        // Добавляем бонусы к клику или авто-доходу
+        if (card.type === 'click') {
+            clickPower += card.power;
+        } else if (card.type === 'auto') {
+            autoIncome += card.power;
+        }
+
+        refreshScreen();
+    };
+
+    // Клик по большой кнопке
+    document.getElementById('main-click-btn').addEventListener('click', () => {
+        money += clickPower;
+        refreshScreen();
+    });
+
+    // Ежесекундный таймер для автокликера
+    setInterval(() => {
+        if (autoIncome > 0) {
+            money += autoIncome;
+            refreshScreen();
+        }
+    }, 1000);
+
+    // Запуск игры
+    buildShop();
+    refreshScreen();
+</script>
+
+</body>
+</html>
