@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Супер Симулятор Дровосека</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: rgba(22, 30, 49, 0.8);
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-glow: rgba(16, 185, 129, 0.3);
+            --text-main: #f8fafc;
+            --text-muted: #64748b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: sans-serif; }
+
+        body {
+            background-color: var(--bg-color); color: var(--text-main); min-height: 100vh;
+            display: flex; justify-content: center; align-items: center; overflow-x: hidden;
+            background: radial-gradient(circle at center, #1e293b 0%, #0b0f19 100%); padding: 20px;
+        }
+
+        .game-container {
+            display: flex; gap: 30px; max-width: 1200px; width: 100%;
+            backdrop-filter: blur(10px); justify-content: center; align-items: flex-start;
+        }
+
+        @media (max-width: 968px) { .game-container { flex-direction: column; align-items: center; } }
+
+        .click-zone {
+            flex: 1.2; display: flex; flex-direction: column; align-items: center;
+            background: var(--panel-bg); padding: 30px; border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05); text-align: center;
+        }
+
+        .hud { margin-bottom: 20px; }
+        .balance { font-size: 3.5rem; font-weight: 800; color: var(--accent-green); text-shadow: 0 0 20px var(--accent-glow); transition: transform 0.05s ease; }
+        .stats-row { display: flex; gap: 15px; margin-top: 10px; font-size: 0.95rem; color: #cbd5e1; }
+        .stat-badge { background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 12px; }
+
+        .tree-container {
+            position: relative; width: 280px; height: 280px; display: flex;
+            align-items: center; justify-content: center; cursor: pointer; margin: 20px 0;
+        }
+        .tree { font-size: 140px; transition: transform 0.05s ease; position: relative; z-index: 2; }
+        .tree-glow { position: absolute; width: 220px; height: 220px; background: var(--accent-glow); border-radius: 50%; filter: blur(40px); z-index: 1; pointer-events: none; }
+
+        .progress-bar-container { width: 100%; background: rgba(255,255,255,0.05); height: 12px; border-radius: 6px; overflow: hidden; margin-top: 10px; border: 1px solid rgba(255,255,255,0.1); }
+        .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #3b82f6); transition: width 0.1s linear; }
+        .tree-level-txt { font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; }
+
+        .shake { animation: shakeEffect 0.1s ease-in-out; }
+        @keyframes shakeEffect {
+            0% { transform: scale(1) rotate(0deg); }
+            33% { transform: scale(0.95) rotate(-3deg); }
+            66% { transform: scale(0.95) rotate(3deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        .chip { position: absolute; width: 8px; height: 8px; background: #854d0e; border-radius: 2px; pointer-events: none; z-index: 10; animation: chipFall 0.4s linear forwards; }
+        @keyframes chipFall { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(var(--x), var(--y)) rotate(360deg); opacity: 0; } }
+
+        .floating-text { position: absolute; color: var(--accent-green); font-weight: 800; font-size: 1.6rem; pointer-events: none; z-index: 10; animation: floatUp 0.5s ease-out forwards; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        @keyframes floatUp { 0% { transform: translateY(0) scale(0.7); opacity: 1; } 100% { transform: translateY(-80px) scale(1.1); opacity: 0; } }
+
+        .axe-effect { position: absolute; font-size: 50px; pointer-events: none; z-index: 5; animation: axeStrike 0.15s ease-out forwards; }
+        @keyframes axeStrike { 0% { transform: translate(20px, -20px) rotate(35deg); opacity: 0; } 50% { opacity: 1; } 100% { transform: translate(-5px, 5px) rotate(-10deg); opacity: 0; } }
+
+        .side-panels { flex: 1; display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 420px; }
+        .shop-panel { background: var(--panel-bg); padding: 20px; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.05); max-height: 45vh; overflow-y: auto; }
+        .shop-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px; display: flex; justify-content: space-between; }
+        .shop-items { display: flex; flex-direction: column; gap: 10px; }
+        
+        .shop-item { display: flex; align-items: center; background: rgba(11, 15, 25, 0.5); padding: 12px; border-radius: 16px; border: 1px solid transparent; transition: all 0.2s ease; cursor: pointer; }
+        .shop-item:hover:not(.locked) { border-color: var(--accent-green); background: rgba(16, 185, 129, 0.03); }
+        .shop-item.locked { opacity: 0.3; cursor: not-allowed; }
+        .shop-item.equipped { border-color: var(--accent-blue); background: rgba(59, 130, 246, 0.08); }
+
+        .item-icon { font-size: 28px; margin-right: 12px; background: rgba(255,255,255,0.03); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+        .item-details { flex: 1; }
+        .item-name { font-weight: 600; font-size: 1rem; }
+        .item-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 1px; }
+        .item-cost { font-weight: 700; color: var(--accent-green); font-size: 0.9rem; background: rgba(16, 185, 129, 0.08); padding: 4px 10px; border-radius: 20px; }
+        .item-status { font-size: 0.8rem; font-weight: 600; color: var(--accent-blue); }
+        
+        .btn-reset { margin-top: 15px; background: none; border: none; color: #ef4444; font-size: 0.8rem; cursor: pointer; text-decoration: underline; opacity: 0.6; }
+        .btn-reset:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Игровое поле с деревом -->
+        <div class="click-zone">
+            <div class="hud">
+                <div class="balance" id="balance">$0</div>
+                <div class="stats-row">
+                    <div class="stat-badge" id="power-info">Клик: x1</div>
+                    <div class="stat-badge" id="auto-info">Пассивный: $0/с</div>
+                </div>
+            </div>
+            
+            <div class="tree-container" id="tree-trigger">
+                <div class="tree-glow" id="glow-effect"></div>
+                <div class="tree" id="tree">🌲</div>
+            </div>
+
+            <div style="width: 100%; max-width: 300px;">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="tree-progress"></div>
+                </div>
+                <div class="tree-level-txt" id="tree-lvl-txt">Дерево ур. 1 (0/10 ударов)</div>
+            </div>
+            
+            <button class="btn-reset" onclick="resetGame()">Сбросить прогресс</button>
+        </div>
+
+        <!-- Боковые панели магазинов -->
+        <div class="side-panels">
+            <div class="shop-panel">
+                <div class="shop-title"><span>Кузница Топоров (Множители)</span><span>🪓</span></div>
+                <div class="shop-items" id="axes-container"></div>
+            </div>
+
+            <div class="shop-panel">
+                <div class="shop-title"><span>Наёмники и Лесопилки (Авто)</span><span>⚙️</span></div>
+                <div class="shop-items" id="auto-container"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let state = {
+            score: 0,
+            currentAxeIndex: 0,
+            treeClicks: 0,
+            treeLevel: 1,
+            axesBought: [true, false, false, false, false, false, false],
+            autoUpgrades: [0, 0, 0, 0]
+        };
+
+        const baseIncome = 1;
+        const axes = [
+            { name: "Ржавый топорик", cost: 0, multiplier: 1, icon: "🪓" },
+            { name: "Каменный колун", cost: 60, multiplier: 3, icon: "🪨" },
+            { name: "Стальной топор", cost: 300, multiplier: 8, icon: "⚔️" },
+            { name: "Золотой секач", cost: 1500, multiplier: 25, icon: "🔱" },
+            { name: "Алмазный крушитель", cost: 7000, multiplier: 75, icon: "💎" },
+            { name: "Плазменный резак", cost: 35000, multiplier: 260, icon: "⚡" },
+            { name: "Аннигилятор материи", cost: 150000, multiplier: 1000, icon: "🌌" }
+        ];
+
+        const autoUpgradesData = [
+            { name: "Бродячий дровосек", baseCost: 40, income: 1, icon: "👨‍🌾" },
+            { name: "Продвинутая бензопила", baseCost: 200, income: 5, icon: "🪚" },
+            { name: "Паровая лесопилка", baseCost: 1200, income: 25, icon: "🏭" },
+            { name: "Квантовый уничтожитель", baseCost: 8000, income: 120, icon: "🛸" }
+        ];
+
+        const treeTypes = ["🌲", "🌳", "🌴", "🔮", "🍁", "🌟"];
+
+        const balanceEl = document.getElementById('balance');
+        const powerInfoEl = document.getElementById('power-info');
+        const autoInfoEl = document.getElementById('auto-info');
+        const treeTrigger = document.getElementById('tree-trigger');
+        const treeEl = document.getElementById('tree');
+        const glowEl = document.getElementById('glow-effect');
+        const treeProgressEl = document.getElementById('tree-progress');
+        const treeLvlTxt = document.getElementById('tree-lvl-txt');
+        const axesContainer = document.getElementById('axes-container');
+        const autoContainer = document.getElementById('auto-container');
+
+        function loadGame() {
+            const saved = localStorage.getItem('lumberjack_save_v2');
+            if (saved) {
+                try { state = { ...state, ...JSON.parse(saved) }; } catch(e) {}
+            }
+            updateUI();
+        }
+
+        function saveGame() { localStorage.setItem('lumberjack_save_v2', JSON.stringify(state)); }
+        function getClicksNeeded() { return state.treeLevel * 10; }
+        function getTotalPassiveIncome() { return state.autoUpgrades.reduce((sum, count, idx) => sum + count * autoUpgradesData[idx].income, 0); }
+
+        treeTrigger.addEventListener('click', (e) => {
+            const currentAxe = axes[state.currentAxeIndex];
+            const totalEarned = Math.floor(baseIncome * currentAxe.multiplier * (1 + (state.treeLevel - 1) * 0.15));
+            
+            state.score += totalEarned;
+            state.treeClicks++;
+
+            const needed = getClicksNeeded();
+            if (state.treeClicks >= needed) {
+                state.treeClicks = 0;
+                state.treeLevel++;
+                createFloatingText(140, 50, "УРОВЕНЬ АП! 🎉", "#3b82f6");
+            }
+
+            updateUI(); saveGame();
+            treeEl.classList.remove('shake'); void treeEl.offsetWidth; treeEl.classList.add('shake');
+
+            const rect = treeTrigger.getBoundingClientRect();
+            createFloatingText(e.clientX - rect.left, e.clientY - rect.top, `+$${totalEarned}`);
+            createAxeEffect(e.clientX - rect.left, e.clientY - rect.top, currentAxe.icon);
+            createParticles(e.clientX - rect.left, e.clientY - rect.top);
+        });
+
+        function updateUI() {
+            balanceEl.innerText = `$${state.score}`;
+            powerInfoEl.innerText = `Клик: x${axes[state.currentAxeIndex].multiplier}`;
+            autoInfoEl.innerText = `Пассивный: $${getTotalPassiveIncome()}/с`;
+
+            const needed = getClicksNeeded();
+            treeProgressEl.style.width = `${(state.treeClicks / needed) * 100}%`;
+            treeLvlTxt.innerText = `Дерево ур. ${state.treeLevel} (${state.treeClicks}/${needed} ударов)`;
+            treeEl.innerText = treeTypes[(state.treeLevel - 1) % treeTypes.length];
+
+            if (state.treeLevel >= 5) glowEl.style.background = "rgba(168, 85, 247, 0.4)";
+            else if (state.treeLevel >= 3) glowEl.style.background = "rgba(251, 191, 36, 0.4)";
+            else glowEl.style.background = "rgba(16, 185, 129, 0.3)";
+
+            renderShop();
+        }
+
+        function createFloatingText(x, y, text, color = null) {
+            const txt = document.createElement('div'); txt.className = 'floating-text'; txt.innerText = text;
+            if(color) txt.style.color = color;
+            txt.style.left = `${x}px`; txt.style.top = `${y}px`; treeTrigger.appendChild(txt);
+            setTimeout(() => txt.remove(), 500);
+        }
+
+        function createAxeEffect(x, y, icon) {
+            const axe = document.createElement('div'); axe.className = 'axe-effect'; axe.innerText = icon;
+            axe.style.left = `${x - 25}px`; axe.style.top = `${y - 25}px`; treeTrigger.appendChild(axe);
+            setTimeout(() => axe.remove(), 150);
+        }
+
+        function createParticles(x, y) {
+            for (let i = 0; i < 5; i++) {
+                const chip = document.createElement('div'); chip.className = 'chip'; chip.style.left = `${x}px`; chip.style.top = `${y}px`;
+                const xDest = (Math.random() - 0.5) * 120; const yDest = Math.random() * 80 + 40;
+                chip.style.setProperty('--x', `${xDest}px`); chip.style.setProperty('--y', `${yDest}px`);
+                if (state.currentAxeIndex >= 5) chip.style.background = '#00ffff';
+                treeTrigger.appendChild(chip); setTimeout(() => chip.remove(), 400);
+            }
+        }
+
+        function renderShop() {
+            axesContainer.innerHTML = '';
+            axes.forEach((axe, index) => {
+                const item = document.createElement('div'); item.className = 'shop-item';
+                if (!state.axesBought[index] && state.score < axe.cost) item.classList.add('locked');
+                if (index === state.currentAxeIndex) item.classList.add('equipped');
+
+                let action = `<div class="item-cost">$${axe.cost}</div>`;
+                if (state.axesBought[index]) { action = index === state.currentAxeIndex ? `<div class="item-status">Экипирован</div>` : `<div class="item-status" style="color: #64748b">В запасе</div>`; }
+
+                item.innerHTML = `<div class="item-icon">${axe.icon}</div><div class="item-details"><div class="item-name">${axe.name}</div><div class="item-desc">Множитель: x${axe.multiplier}</div></div>${action}`;
+                item.onclick = () => {
+                    if (state.axesBought[index]) { state.currentAxeIndex = index; } 
+                    else if (state.score >= axe.cost) { state.score -= axe.cost; state.axesBought[index] = true; state.currentAxeIndex = index; }
+                    updateUI(); saveGame();
+                };
+                axesContainer.appendChild(item);
+            });
+
+            autoContainer.innerHTML = '';
+            autoUpgradesData.forEach((upg, idx) => {
+                const count = state.autoUpgrades[idx];
+                const cost = Math.floor(upg.baseCost * Math.pow(1.15, count));
+                const item = document.createElement('div'); item.className = 'shop-item';
+                if (state.score < cost) item.classList.add('locked');
+
+                item.innerHTML = `<div class="item-icon">${upg.icon}</div><div class="item-details"><div class="item-name">${upg.name} (${count})</div><div class="item-desc">+$${upg.income}/с</div></div><div class="item-cost">$${cost}</div>`;
+                item.onclick = () => {
+                    if (state.score >= cost) { state.score -= cost; state.autoUpgrades[idx]++; updateUI(); saveGame(); }
+                };
+                autoContainer.appendChild(item);
+            });
+        }
+
+        setInterval(() => {
+            const passive = getTotalPassiveIncome();
+            if (passive > 0) { state.score += passive; balanceEl.innerText = `$${state.score}`; renderShop(); }
+        }, 1000);
+
+        function resetGame() { if(confirm("Сбросить прогресс?")) { localStorage.removeItem('lumberjack_save_v2'); location.reload(); } }
+        loadGame();        treeTrigger.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            treeTrigger.click();
+        });
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+        // Добавляем новые топоры в список прямо через код
+        axes.push(
+            { name: "Кристальный разрушитель", cost: 500000, multiplier: 4500, icon: "🔮", bought: false },
+            { name: "Топор Древней Крови", cost: 2000000, multiplier: 18000, icon: "🩸", bought: false },
+            { name: "Энергетический рассекатель", cost: 10000000, multiplier: 85000, icon: "🔱", bought: false },
+            { name: "Сверхновая звезда", cost: 50000000, multiplier: 400000, icon: "⭐", bought: false },
+            { name: "Топор Бога Времени", cost: 250000000, multiplier: 2000000, icon: "⏳", bought: false }
+        );
+        // Расширяем массив сохранений, чтобы игра знала, что топоров стало больше
+        while(state.axesBought.length < axes.length) { state.axesBought.push(false); }
+                treeTrigger.addEventListener('touchend', (e) => { e.preventDefault(); treeTrigger.click(); });
+        treeTrigger.addEventListener('click', (e) => { if (Math.random() < 0.1) { state.score += Math.floor(baseIncome * axes[state.currentAxeIndex].multiplier * (1 + (state.treeLevel - 1) * 0.15)) * 4; updateUI(); const r = treeTrigger.getBoundingClientRect(); createFloatingText(e.clientX - r.left, e.clientY - r.top - 25, "КРИТ! 🔥 x5", "#ef4444"); } }, true);
+
+
+    </script>
+</body>
+</html><script><script>
+    if (Math.random() < 0.1) { // 10% шанс
+        // Считаем и начисляем х5 бонус денег
+        const earned = Math.floor(baseIncome * axes[state.currentAxeIndex].multiplier * (1 + (state.treeLevel - 1) * 0.15));
+        state.score += earned * 4; 
+        updateUI();
+
+        // 1. Вспышка и сотрясение экрана
+        document.body.style.transition = 'all 0.05s';
+        document.body.style.filter = 'brightness(1.8) saturate(1.5)';
+        document.body.style.transform = `translate(${(Math.random()-0.5)*15}px, ${(Math.random()-0.5)*15}px)`;
+        setTimeout(() => { 
+            document.body.style.filter = ''; 
+            document.body.style.transform = ''; 
+        }, 100);
+
+        // 2. Всплывающий сочный красный текст
+        const r = treeTrigger.getBoundingClientRect();
+        createFloatingText(e.clientX - r.left, e.clientY - r.top - 20, "КРИТ! 🔥 x5", "#ff3333");
+
+        // 3. Фонтан огненных искр
+        for (let i = 0; i < 12; i++) {
+            const spark = document.createElement('div');
+            spark.className = 'chip';
+            spark.style.left = `${e.clientX - r.left}px`;
+            spark.style.top = `${e.clientY - r.top}px`;
+            spark.style.background = Math.random() > 0.5 ? '#ff4500' : '#ffcc00';
+            spark.style.boxShadow = '0 0 10px #ff4500';
+            spark.style.borderRadius = '50%';
+            spark.style.setProperty('--x', `${(Math.random() - 0.5) * 240}px`);
+            spark.style.setProperty('--y', `${(Math.random() - 0.5) * 200 - 50}px`);
+            treeTrigger.appendChild(spark);
+            setTimeout(() => spark.remove(), 400);
+        }
+    }
+}, true);
+</script>
+<script>
+<script>
+// === ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ СИСТЕМА ПЕРЕРОЖДЕНИЙ ===
+(function() {
+    // Безопасно проверяем и создаем переменную звезд
+    if (typeof state.stars === 'undefined') { state.stars = 0; }
+
+    // 1. Создаем плашку звезд в верхнем меню
+    const statsRow = document.querySelector('.stats-row');
+    let starsBadge = document.getElementById('stars-info');
+    if (!starsBadge && statsRow) {
+        starsBadge = document.createElement('div');
+        starsBadge.className = 'stat-badge';
+        starsBadge.id = 'stars-info';
+        starsBadge.style.borderColor = '#a855f7';
+        starsBadge.style.color = '#c084fc';
+        statsRow.appendChild(starsBadge);
+    }
+
+    // 2. Создаем кнопку перерождения
+    const clickZone = document.querySelector('.click-zone');
+    let prestigeBtn = document.getElementById('prestige-btn');
+    if (!prestigeBtn && clickZone) {
+        prestigeBtn = document.createElement('button');
+        prestigeBtn.id = 'prestige-btn';
+        prestigeBtn.style.cssText = `
+            display: none; margin-top: 15px; background: linear-gradient(135deg, #a855f7, #6366f1);
+            color: white; border: none; padding: 12px 24px; font-size: 1rem; font-weight: 700;
+            border-radius: 12px; cursor: pointer; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
+            transition: transform 0.2s; touch-action: manipulation;
+        `;
+        prestigeBtn.onmouseover = () => prestigeBtn.style.transform = 'scale(1.05)';
+        prestigeBtn.onmouseout = () => prestigeBtn.style.transform = 'scale(1)';
+        
+        const resetBtn = document.querySelector('.btn-reset');
+        if (resetBtn) clickZone.insertBefore(prestigeBtn, resetBtn);
+    }
+
+    // 3. Переопределяем функцию обновления интерфейса
+    const originalUpdateUI = window.updateUI;
+    window.updateUI = function() {
+        const prestigeBonus = 1 + state.stars;
+        
+        if (starsBadge) {
+            starsBadge.innerText = `🌌 Звёзды: ${state.stars} (доход x${prestigeBonus})`;
+        }
+
+        // Кнопка появляется только когда на балансе накопится $1,000,000
+        if (state.score >= 1000000 && prestigeBtn) {
+            const potentialStars = Math.floor(state.score / 1000000);
+            prestigeBtn.innerText = `Сделать Перерождение 🌀 (+${potentialStars} 🌟)`;
+            prestigeBtn.style.display = 'block';
+        } else if (prestigeBtn) {
+            prestigeBtn.style.display = 'none';
+        }
+
+        if (typeof originalUpdateUI === 'function') originalUpdateUI();
+    };
+
+    // 4. Начисление бонуса от звезд при клике по дереву
+    treeTrigger.addEventListener('click', () => {
+        if (state.stars > 0) {
+            const currentAxe = axes[state.currentAxeIndex];
+            const multiplierBonus = currentAxe.multiplier * (1 + (state.treeLevel - 1) * 0.15);
+            const earnedBonus = Math.floor(baseIncome * multiplierBonus) * state.stars;
+            state.score += earnedBonus;
+            balanceEl.innerText = `$${state.score}`;
+        }
+    }, false);
+
+    // 5. Начисление бонуса от звезд к пассивным лесопилкам
+    setInterval(() => {
+        if (state.stars > 0) {
+            const passive = state.autoUpgrades.reduce((sum, count, idx) => sum + count * autoUpgradesData[idx].income, 0);
+            if (passive > 0) {
+                state.score += passive * state.stars;
+                balanceEl.innerText = `$${state.score}`;
+            }
+        }
+    }, 1000);
+
+    // 6. Логика сброса при нажатии на кнопку Перерождения
+    if (prestigeBtn) {
+        prestigeBtn.onclick = () => {
+            const potentialStars = Math.floor(state.score / 1000000);
+            if (confirm(`Вы уверены? Вы сбросите баксы, топоры и здания, но получите ${potentialStars} Звёзд(ы) Перерождения!`)) {
+                state.stars += potentialStars;
+                state.score = 0;
+                state.currentAxeIndex = 0;
+                state.treeClicks = 0;
+                state.treeLevel = 1;
+                state.axesBought = [true, false, false, false, false, false, false, false, false, false, false, false];
+                state.autoUpgrades =; 
+                
+                if (typeof saveGame === 'function') saveGame();
+                window.updateUI();
+                
+                document.body.style.filter = 'hue-rotate(180deg) brightness(2)';
+                setTimeout(() => document.body.style.filter = '', 500);
+            }
+        };
+    }
+
+    // Первый запуск
+    setTimeout(window.updateUI, 200);
+})();
+</script>
