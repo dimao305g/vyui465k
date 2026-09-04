@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Неоновый Симулятор Кейсов</title>
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --panel-bg: rgba(22, 30, 49, 0.8);
+            --accent-gold: #eab308;
+            --text-main: #f8fafc;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box; margin: 0; padding: 0; user-select: none;
+            font-family: system-ui, -apple-system, sans-serif; touch-action: manipulation;
+        }
+
+        body {
+            background-color: var(--bg-dark); color: var(--text-main);
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start; padding: 30px 10px;
+            background: radial-gradient(circle at center, #1e293b 0%, #0b0f19 100%);
+        }
+
+        .game-container { max-width: 900px; width: 100%; display: flex; flex-direction: column; gap: 20px; }
+
+        .case-zone {
+            background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 24px; padding: 25px; text-align: center; position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+        }
+
+        .roulette-wrapper {
+            position: relative; width: 100%; height: 130px; 
+            margin: 20px 0; overflow: hidden;
+            background: rgba(11, 15, 25, 0.6); border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .roulette-wrapper::before {
+            content: ''; position: absolute; left: 50%; top: 0; bottom: 0;
+            width: 4px; background: var(--accent-gold); z-index: 10;
+            box-shadow: 0 0 15px var(--accent-gold); transform: translateX(-50%);
+        }
+
+        .roulette-line { display: flex; position: absolute; left: 0; top: 0; height: 100%; width: max-content; }
+
+        .skin-card {
+            width: 150px; height: 100%; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+            padding: 10px; border-right: 1px solid rgba(255,255,255,0.03);
+            position: relative; background: linear-gradient(180deg, rgba(255,255,255,0.01) 0%, rgba(0,0,0,0.4) 100%);
+        }
+
+        .skin-card::after {
+            content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 4px;
+            background: var(--rarity-color); box-shadow: 0 -2px 10px var(--rarity-color);
+        }
+
+        .skin-icon { font-size: 45px; margin-bottom: 5px; }
+        .skin-name { font-size: 0.85rem; font-weight: 700; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .skin-type { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
+
+        .btn-open {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white; border: none; padding: 14px 40px; font-size: 1.1rem;
+            font-weight: 800; border-radius: 14px; cursor: pointer;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); transition: all 0.2s ease; -webkit-tap-highlight-color: transparent;
+        }
+        .btn-open:hover:not(:disabled) { transform: scale(1.03); box-shadow: 0 0 30px rgba(16, 185, 129, 0.6); }
+        .btn-open:disabled { opacity: 0.3; cursor: not-allowed; transform: scale(1); }
+
+        .inventory-zone { background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.05); border-radius: 24px; padding: 25px; }
+        .inventory-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .wallet { color: var(--accent-gold); font-size: 1.2rem; }
+        
+        .inventory-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px; max-height: 320px; overflow-y: auto; padding-right: 5px;
+        }
+
+        .inv-card {
+            background: rgba(11, 15, 25, 0.5); border: 1px solid rgba(255,255,255,0.03);
+            border-radius: 12px; padding: 10px; text-align: center; display: flex;
+            flex-direction: column; align-items: center; justify-content: center; position: relative;
+            animation: popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+        .inv-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--rarity-color); border-radius: 0 0 12px 12px; }
+        .inv-icon { font-size: 35px; }
+        .inv-name { font-size: 0.75rem; font-weight: 700; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+        .inv-price { font-size: 0.7rem; color: var(--accent-gold); margin-top: 1px; font-weight: 600; }
+        
+        .btn-sell {
+            margin-top: 8px; background: rgba(239, 68, 68, 0.15); color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3); padding: 4px 10px; font-size: 0.7rem;
+            border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; z-index: 5; -webkit-tap-highlight-color: transparent;
+        }
+        .btn-sell:hover { background: #ef4444; color: white; }
+
+        @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .win-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(3,7,18,0.85);
+            z-index: 100; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px);
+        }
+        .win-modal {
+            background: #161e31; border: 2px solid var(--rarity-color); border-radius: 24px;
+            padding: 35px; text-align: center; max-width: 380px; width: 90%;
+            box-shadow: 0 0 40px var(--rarity-color); animation: popIn 0.4s ease forwards;
+        }
+        .win-glow { font-size: 75px; margin-bottom: 10px; display: inline-block; }
+        .win-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 5px; }
+        .win-rarity { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--rarity-color); margin-bottom: 15px; letter-spacing: 1px; }
+        .btn-close-modal { background: var(--text-main); color: var(--bg-dark); border: none; padding: 10px 25px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; margin-top: 15px; -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Рулетка -->
+        <div class="case-zone">
+            <h2 style="font-size: 1.3rem; font-weight: 800;">🌌 КЕЙС «ГАЛАКТИЧЕСКИЙ КРУШИТЕЛЬ»</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Испытай удачу и выбей редчайший Меч Пустоты!</p>
+            
+            <div class="roulette-wrapper">
+                <div class="roulette-line" id="rouletteLine"></div>
+            </div>
+            <button class="btn-open" id="btnOpen" onclick="openCase()">ОТКРЫТЬ КЕЙС</button>
+        </div>
+
+        <!-- Инвентарь -->
+        <div class="inventory-zone">
+            <div class="inventory-title">
+                <span>🎒 Мой инвентарь</span>
+                <span class="wallet" id="walletBalance">$0</span>
+            </div>
+            <div class="inventory-grid" id="inventoryGrid"></div>
+        </div>
+    </div>
+
+    <!-- Модалка победы -->
+    <div class="win-overlay" id="winOverlay">
+        <div class="win-modal" id="winModal">
+            <div class="win-glow" id="winIcon">⚔️</div>
+            <div class="win-title" id="winName">Предмет</div>
+            <div class="win-rarity" id="winRarity">Редкость</div>
+            <div style="font-size: 1.1rem; color: var(--accent-gold); font-weight: 700;" id="winPrice">$0</div>
+            <button class="btn-close-modal" onclick="closeModal()">В ИНВЕНТАРЬ</button>
+        </div>
+    </div>
+    <script>
+        const rarities = {
+            common: { color: "#94a3b8", label: "Ширпотреб", chance: 0.50 },
+            rare: { color: "#3b82f6", label: "Редкое", chance: 0.30 },
+            classified: { color: "#8b5cf6", label: "Запрещенное", chance: 0.14 },
+            covert: { color: "#ef4444", label: "Тайное", chance: 0.05 },
+            knife: { color: "#eab308", label: "★ НОЖ ★", chance: 0.01 }
+        };
+
+        const skinsPool = [
+            { name: "P250 | Сверхновая", type: "common", icon: "🔫", minPrice: 1, maxPrice: 3 },
+            { name: "Glock-18 | Горелка", type: "common", icon: "🔫", minPrice: 2, maxPrice: 4 },
+            { name: "M4A4 | Магний", type: "rare", icon: "🔫", minPrice: 8, maxPrice: 15 },
+            { name: "AK-47 | Ледяной уголь", type: "rare", icon: "💥", minPrice: 15, maxPrice: 30 },
+            { name: "AWP | Азимов", type: "classified", icon: "🔱", minPrice: 85, maxPrice: 140 },
+            { name: "M4A1-S | Скоростной зверь", type: "classified", icon: "🧬", minPrice: 70, maxPrice: 110 },
+            { name: "AK-47 | Огненный змей", type: "covert", icon: "🐉", minPrice: 450, maxPrice: 700 },
+            { name: "AWP | История о драконе", type: "covert", icon: "👑", minPrice: 1200, maxPrice: 1900 },
+            { name: "★ Керамбит | Градиент", type: "knife", icon: "🔪", minPrice: 2500, maxPrice: 3800 },
+            { name: "★ Бабочка | Изумруд", type: "knife", icon: "⚔️", minPrice: 4000, maxPrice: 6200 }
+        ];
+
+        let state = { money: 0, inventory: [] };
+        const cardWidth = 150; const totalCards = 40;
+
+        function playTickSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(500, ctx.currentTime);
+                gain.gain.setValueAtTime(0.04, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(); osc.stop(ctx.currentTime + 0.04);
+            } catch(e) {}
+        }
+
+        function getRandomSkin() {
+            const rand = Math.random(); let cumulative = 0; let targetRarity = "common";
+            for (const [key, value] of Object.entries(rarities)) {
+                cumulative += value.chance; if (rand <= cumulative) { targetRarity = key; break; }
+            }
+            const selection = skinsPool.filter(s => s.type === targetRarity);
+            const baseSkin = selection[Math.floor(Math.random() * selection.length)];
+            const price = Math.floor(Math.random() * (baseSkin.maxPrice - baseSkin.minPrice + 1)) + baseSkin.minPrice;
+            return { ...baseSkin, price, id: Date.now() + Math.random() };
+        }
+
+        function initRoulette() {
+            const line = document.getElementById('rouletteLine');
+            line.innerHTML = ''; line.style.transition = 'none'; line.style.transform = 'translateX(0px)';
+            for (let i = 0; i < totalCards; i++) {
+                const skin = getRandomSkin(); const card = document.createElement('div');
+                card.className = 'skin-card'; card.style.setProperty('--rarity-color', rarities[skin.type].color);
+                card.innerHTML = `<div class="skin-icon">${skin.icon}</div><div class="skin-name">${skin.name}</div><div class="skin-type">${rarities[skin.type].label}</div>`;
+                line.appendChild(card);
+            }
+        }
+
+        function openCase() {
+            document.getElementById('btnOpen').disabled = true;
+            initRoulette();
+            const line = document.getElementById('rouletteLine');
+            const wrapper = document.querySelector('.roulette-wrapper');
+            const targetIndex = 34; const centerOffset = wrapper.offsetWidth / 2;
+            const randomShift = Math.floor(Math.random() * (cardWidth - 20)) + 10;
+            const finalPosition = (targetIndex * cardWidth) - centerOffset + randomShift;
+
+            const winningCardNode = line.children[targetIndex];
+            const wonSkin = getRandomSkin();
+            winningCardNode.style.setProperty('--rarity-color', rarities[wonSkin.type].color);
+            winningCardNode.innerHTML = `<div class="skin-icon">${wonSkin.icon}</div><div class="skin-name">${wonSkin.name}</div><div class="skin-type">${rarities[wonSkin.type].label}</div>`;
+
+            line.style.transition = 'transform 4.2s cubic-bezier(0.1, 0.45, 0.1, 1)';
+            line.style.transform = `translateX(-${finalPosition}px)`;
+
+            let lastTickCard = 0;
+            const checkTickInterval = setInterval(() => {
+                const style = window.getComputedStyle(line);
+                const matrix = new WebKitCSSMatrix(style.transform);
+                const currentCardIndex = Math.floor((Math.abs(matrix.m41) + centerOffset) / cardWidth);
+                if (currentCardIndex !== lastTickCard && currentCardIndex < targetIndex) {
+                    playTickSound(); lastTickCard = currentCardIndex;
+                }
+            }, 30);
+
+            setTimeout(() => {
+                clearInterval(checkTickInterval); showWinModal(wonSkin);
+                state.inventory.unshift(wonSkin); saveGame(); renderInventory();
+                document.getElementById('btnOpen').disabled = false;
+            }, 4300);
+        }
+
+        function showWinModal(skin) {
+            document.getElementById('winIcon').innerText = skin.icon;
+            document.getElementById('winName').innerText = skin.name;
+            document.getElementById('winRarity').innerText = rarities[skin.type].label;
+            document.getElementById('winPrice').innerText = `$${skin.price}`;
+            document.getElementById('winModal').style.setProperty('--rarity-color', rarities[skin.type].color);
+            document.getElementById('winOverlay').style.display = 'flex';
+        }
+        function closeModal() { document.getElementById('winOverlay').style.display = 'none'; }
+
+        function renderInventory() {
+            const grid = document.getElementById('inventoryGrid'); grid.innerHTML = '';
+            document.getElementById('walletBalance').innerText = `$${state.money}`;
+            state.inventory.forEach(skin => {
+                const card = document.createElement('div'); card.className = 'inv-card';
+                card.style.setProperty('--rarity-color', rarities[skin.type].color);
+                card.innerHTML = `<div class="inv-icon">${skin.icon}</div><div class="inv-name">${skin.name}</div><div class="inv-price">$${skin.price}</div><button class="btn-sell" onclick="sellSkin(${skin.id}, ${skin.price})">Продать</button>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function sellSkin(id, price) {
+            state.inventory = state.inventory.filter(s => s.id !== id); state.money += price;
+            saveGame(); renderInventory();
+        }
+        function saveGame() { localStorage.setItem('case_sim_save_v1', JSON.stringify(state)); }
+        function loadGame() {
+            const saved = localStorage.getItem('case_sim_save_v1');
+            if (saved) { try { state = JSON.parse(saved); } catch(e) {} }
+            renderInventory();
+        }
+
+        initRoulette(); loadGame();
+    </script>
+</body>
+</html>
